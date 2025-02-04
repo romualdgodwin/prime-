@@ -3,7 +3,7 @@ name: Deploy to AWS
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18  # Mets la version adaptée
+          node-version: 21  # Mets la version adaptée
 
       - name: Install dependencies
         run: npm install
@@ -37,7 +37,7 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<EOF
             # Aller dans le répertoire de l'application
-            cd /home/raphaelserv/mon-app
+            cd /home/flamby/Projets/prime-
 
             # Mettre à jour le code depuis le dépôt Git
             git pull origin master
