@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Deploy to EC2 with Docker
 
 on:
   push:
@@ -10,45 +10,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # Étape 1 : Vérifier le code
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 21  # Mets la version adaptée
+    # Étape 2 : Configurer SSH
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Install dependencies
-        run: npm install
+    # Étape 3 : Déployer le code et gérer les conteneurs Docker
+    - name: Deploy to EC2 with Docker
+      run: |
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<EOF
+          cd ${{ secrets.WORK_DIR }}
+          git checkout ${{ secrets.MAIN_BRANCH }}
+          git pull
+          docker-compose -f docker-compose.yml down
+          docker system prune -af
+          docker image prune -af
+          docker-compose up -d --build
+        EOF
 
-      - name: Run tests
-        run: npm test  # Exécute les tests, si ça échoue, le déploiement s'arrête
-
-      - name: Set up SSH
-        if: success()  # Exécute cette étape seulement si les tests réussissent
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy application
-        if: success()  # Exécute cette étape seulement si les tests réussissent
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<EOF
-            # Aller dans le répertoire de l'application
-            cd /home/flamby/Projets/prime-
-
-            # Mettre à jour le code depuis le dépôt Git
-            git pull origin master
-
-            # Arrêter et supprimer le conteneur existant
-            docker-compose down
-
-            # Supprimer les images Docker obsolètes
-            docker system prune -af
-            docker image prune -af
-
-            # Recréer et redémarrer le conteneur
-            docker-compose up -d --build
-          EOF
+    # Étape 4 : Nettoyer les clés SSH
+    - name: Clean up
+      run: |
+        rm -rf ~/.ssh
